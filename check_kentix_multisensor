@@ -1,0 +1,225 @@
+#!/usr/bin/env python
+# COPYRIGHT
+# 
+# This software is Copyright (c)  2011 NETWAYS GmbH, Gunnar Beutner
+#                                 <support@netways.de>
+# 
+# (Except where explicitly superseded by other copyright notices)
+# 
+# LICENSE
+# 
+# This work is made available to you under the terms of Version 2 of
+# the GNU General Public License. A copy of that license should have
+# been provided with this software, but in any event can be snarfed
+# from http://www.fsf.org.
+# 
+# This work is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301 or visit their web page on the internet at
+# http://www.fsf.org.
+# 
+# 
+# CONTRIBUTION SUBMISSION POLICY:
+# 
+# (The following paragraph is not intended to limit the rights granted
+# to you to modify and distribute this software under the terms of
+# the GNU General Public License and is only of importance to you if
+# you choose to contribute your changes and enhancements to the
+# community by submitting them to NETWAYS GmbH.)
+# 
+# By intentionally submitting any modifications, corrections or
+# derivatives to this work, or any other work intended for use with
+# this Software, to NETWAYS GmbH, you confirm that
+# you are the copyright holder for those contributions and you grant
+# NETWAYS GmbH a nonexclusive, worldwide, irrevocable,
+# royalty-free, perpetual, license to use, copy, create derivative
+# works based on those contributions, and sublicense and distribute
+# those contributions and any derivatives thereof.
+# 
+# Nagios and the Nagios logo are registered trademarks of Ethan Galstad.
+
+import sys
+import pysnmp
+from nagaconda import Plugin
+
+try:
+    from pysnmp.entity.rfc3413.oneliner import cmdgen
+except ImportError:
+    print "This plugin requires the PySNMP extension for Python. Please" + \
+        " make sure it is properly installed (e.g. via apt-get install" + \
+        " python-pysnmp2 on Debian)."
+    sys.exit(1)
+
+oid_kentix = (1, 3, 6, 1, 4, 1, 37954)
+oid_multisensorLan = oid_kentix + (1,)
+oid_datapoints = oid_multisensorLan + (1,)
+
+oid_temperatureEntry = oid_datapoints + (1,)
+oid_temperatureValue = oid_temperatureEntry + (1,)
+oid_temperatureMin = oid_temperatureEntry + (2,)
+oid_temperatureMax = oid_temperatureEntry + (3,)
+oid_temperatureAlarm = oid_temperatureEntry + (4,)
+
+oid_humidityEntry = oid_datapoints + (2,)
+oid_humidityValue = oid_humidityEntry + (1,)
+oid_humidityMin = oid_humidityEntry + (2,)
+oid_humidityMax = oid_humidityEntry + (3,)
+oid_humidityAlarm = oid_humidityEntry + (4,)
+
+oid_dewpointEntry = oid_datapoints + (3,)
+oid_dewpointValue = oid_dewpointEntry + (1,)
+oid_dewpointMin = oid_dewpointEntry + (2,)
+oid_dewpointAlarm = oid_dewpointEntry + (3,)
+
+oid_coEntry = oid_datapoints + (4,)
+oid_coValue = oid_coEntry + (1,)
+oid_coMax = oid_coEntry + (2,)
+oid_coAlarm = oid_coEntry + (3,)
+
+oid_motionEntry = oid_datapoints + (5,)
+oid_motionValue = oid_motionEntry + (1,)
+oid_motionMax = oid_motionEntry + (2,)
+oid_motionAlarm = oid_motionEntry + (3,)
+
+oid_digitalIn1 = oid_datapoints + (6,)
+oid_digitalIn1Value = oid_digitalIn1 + (1,)
+
+oid_digitalIn2 = oid_datapoints + (7,)
+oid_digitalIn2Value = oid_digitalIn2 + (1,)
+
+oid_digitalOut2 = oid_datapoints + (8,)
+oid_digitalOut2Value = oid_digitalOut2 + (1,)
+
+oids_to_check = {
+    oid_temperatureValue + (0, ): 'temperature',
+    oid_humidityValue + (0, ): 'humidity',
+    oid_dewpointValue + (0, ): 'dewpoint',
+    oid_coValue + (0, ): 'co',
+    oid_motionValue + (0, ): 'motion',
+    oid_digitalIn1Value + (0, ): 'digitalIn1',
+    oid_digitalIn2Value + (0, ): 'digitalIn2',
+    oid_digitalOut2Value + (0, ): 'digitalOut2'
+}
+
+oids_to_check_thresholds = {
+    oid_temperatureMin + (0, ): ['temperature', 'min'],
+    oid_temperatureMax + (0, ): ['temperature', 'max'],
+    oid_temperatureAlarm + (0, ): ['temperature', 'alarm'],
+
+    oid_humidityMin + (0, ): ['humidity', 'min'],
+    oid_humidityMax + (0, ): ['humidity', 'max'],
+    oid_humidityAlarm + (0, ): ['humidity', 'alarm'],
+
+    oid_dewpointMin + (0, ): ['dewpoint', 'min'],
+    oid_dewpointAlarm + (0, ): ['dewpoint', 'alarm'],
+
+    oid_coMax + (0, ): ['co', 'max'],
+    oid_coAlarm + (0, ): ['co', 'alarm'],
+
+    oid_motionMax + (0, ): ['motion', 'max'],
+    oid_motionAlarm + (0, ): ['motion', 'alarm']
+}
+
+helptext = """
+Example:
+
+./check_kentix_multisensor -h <host>
+    -w temperature=~:25 \\
+    -c temperature=~:30
+
+This check would be CRITICAL if one of the following conditions are met:
+-The check request fails (wrong IP address, device unavailable, etc.).
+-The sensor's temperature value is above 30.
+
+The check would return a WARNING if the temperature value is above 25 unless
+one of the CRITICAL conditions were encountered - in which case
+the CRITICAL condition takes precedence.
+
+Instead of manually specifying warning/critical ranges you can use the -t 1
+option to use the alarm settings you configured in the device's web interface.
+"""
+
+plugin = Plugin("Checks the status of Kentix MultiSensor-LAN devices.",
+                "1.0", helptext)
+
+plugin.add_option('h', 'host', 'The hostname of the device.', required=True)
+plugin.add_option('s', 'community', 'The SNMP community (default: public).')
+plugin.add_option('t', 'thresholds', 'Use the device\'s alarm ' +
+    'thresholds/settings. (default: 0).')
+
+plugin.enable_status('warning')
+plugin.enable_status('critical')
+
+plugin.start()
+
+if plugin.options.community == None:
+    plugin.options.community = 'public'
+
+if plugin.options.thresholds == None:
+    plugin.options.thresholds = False
+
+errorIndication, errorStatus, errorIndex, varBinds = \
+    cmdgen.CommandGenerator().getCmd(
+    cmdgen.CommunityData('check', plugin.options.community, 0),
+    cmdgen.UdpTransportTarget((plugin.options.host, 161)),
+    *oids_to_check.keys() + oids_to_check_thresholds.keys())
+
+if errorIndication != None:
+    plugin.set_critical()
+    plugin.set_status_message("SNMP request failed: " + errorIndication)
+    plugin.finish()
+
+sensordata = {}
+
+for key, value in varBinds:
+    if key not in oids_to_check:
+        continue
+
+    try:
+        value = int(value)
+    except:
+        plugin.set_critical()
+        plugin.set_status_message("SNMP request returned invalid data.")
+        plugin.finish()
+
+    sensordata[oids_to_check[key]] = value
+
+for key, value in sensordata.items():
+    plugin.set_value(key, value)
+
+if plugin.options.thresholds:
+    alarms = {}
+
+    for key, value in varBinds:
+        if key not in oids_to_check_thresholds:
+            continue
+
+        thresh_name, thresh_type = oids_to_check_thresholds[key]
+    
+
+        if thresh_name in alarms and alarms[thresh_name] == False:
+            continue
+
+        if thresh_type == 'alarm' and value == 0:
+            alarms[thresh_name] = False
+            continue
+
+        if thresh_type == 'min' and value > sensordata[thresh_name]:
+            alarms[thresh_name] = True
+
+        if thresh_type == 'max' and value < sensordata[thresh_name]:
+            alarms[thresh_name] = True 
+
+    for key, value in alarms.items():
+        if value == True:
+            plugin.set_critical()
+            plugin.set_status_message("Device threshold for '%s' exceeded." %
+                (key))
+
+plugin.finish()
