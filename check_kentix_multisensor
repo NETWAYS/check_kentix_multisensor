@@ -57,7 +57,7 @@ except ImportError:
     sys.exit(1)
 
 oid_kentix = (1, 3, 6, 1, 4, 1, 37954)
-oid_multisensorLan = oid_kentix + (1,)
+oid_multisensorLan = oid_kentix + (2,)
 oid_datapoints = oid_multisensorLan + (1,)
 
 oid_temperatureEntry = oid_datapoints + (1,)

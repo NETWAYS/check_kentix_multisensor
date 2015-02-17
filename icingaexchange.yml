@@ -8,14 +8,14 @@ type: Plugin
 license: gplv2
 releases: 
   - 
-    name: 1.0
-    description: "1.0 Release"
+    name: 2.0
+    description: "2.0 Release"
     files: 
       - 
         name: check_kentix_multisensor
         url: "file:///check_kentix_multisensor"
         description: none
-        checksum: a47462392718d71bffa31828622b0c1c
+        checksum: 41f46b631df202eebad0a5ab2a8bf794
       - 
         name: nagaconda.tar.gz
         url: "file:///nagaconda.tar.gz"
